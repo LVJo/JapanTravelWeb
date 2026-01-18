@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2026 日本櫻花之旅</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sakura: {
+                            50: '#fff0f5',
+                            100: '#ffe4e9',
+                            300: '#fca5b9',
+                            500: '#f472b6',
+                            600: '#e11d48',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Noto Sans TC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #f3f4f6; }
+        /* 隱藏滾動條但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 櫻花飄落動畫 */
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        .petal {
+            position: absolute;
+            background: #fca5b9;
+            width: 10px;
+            height: 10px;
+            border-radius: 100% 0 100% 0;
+            opacity: 0.6;
+            animation: float 10s linear infinite;
+            z-index: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="relative min-h-screen flex justify-center bg-gray-100 overflow-hidden">
+    
+    <div class="w-full max-w-md h-[100dvh] bg-sakura-50 relative shadow-2xl flex flex-col overflow-hidden">
+        
+        <div class="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-sakura-300 to-transparent opacity-20 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none"></div>
+
+        <header class="pt-12 pb-4 px-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 shadow-sm">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800 tracking-tight">
+                        <i class="fa-solid fa-plane-departure text-sakura-500 mr-2"></i>{{ currentTabTitle }}
+                    </h1>
+                    <p class="text-xs text-gray-500 mt-1">2026/03/28 - 2026/04/05</p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-sakura-100 flex items-center justify-center text-sakura-600 shadow-inner">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto no-scrollbar p-4 pb-24 z-10 relative">
+            
+            <div v-if="currentTab === 'schedule'" class="space-y-4">
+                <div class="flex overflow-x-auto no-scrollbar gap-3 pb-2">
+                    <button v-for="(day, index) in tripDays" :key="index" 
+                        @click="activeDate = index"
+                        :class="activeDate === index ? 'bg-sakura-500 text-white shadow-lg scale-105' : 'bg-white text-gray-500 shadow-sm'"
+                        class="flex-shrink-0 px-4 py-2 rounded-2xl flex flex-col items-center min-w-[70px] transition-all duration-300">
+                        <span class="text-xs opacity-80">{{ day.dateShort }}</span>
+                        <span class="font-bold text-lg">{{ day.dayName }}</span>
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <div v-if="tripDays[activeDate].events.length === 0" class="text-center py-10 text-gray-400">
+                        <i class="fa-regular fa-calendar-xmark text-4xl mb-2"></i>
+                        <p>這天還沒有行程喔！</p>
+                    </div>
+
+                    <div v-for="(event, idx) in tripDays[activeDate].events" :key="idx" class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-sakura-300 flex items-start group">
+                        <div class="mr-4 text-center min-w-[50px]">
+                            <span class="block text-lg font-bold text-gray-700">{{ event.time }}</span>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800">{{ event.title }}</h3>
+                            <p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-location-dot mr-1 text-sakura-500"></i>{{ event.location }}</p>
+                        </div>
+                        <button @click="deleteEvent(idx)" class="text-gray-300 hover:text-red-500 transition-colors p-2">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button @click="showAddModal = true" class="w-full py-3 mt-2 rounded-xl border-2 border-dashed border-sakura-300 text-sakura-500 font-bold hover:bg-sakura-50 transition-colors">
+                    <i class="fa-solid fa-plus mr-2"></i>新增行程
+                </button>
+            </div>
+
+            <div v-if="currentTab === 'money'" class="space-y-6">
+                <div class="bg-gradient-to-r from-sakura-500 to-sakura-600 rounded-3xl p-6 text-white shadow-lg shadow-sakura-300/50">
+                    <p class="text-sm opacity-90">總支出</p>
+                    <h2 class="text-4xl font-bold mt-1">¥{{ totalExpense.toLocaleString() }}</h2>
+                    <div class="mt-4 flex -space-x-2 overflow-hidden">
+                        <div v-for="m in members" class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs border border-white">
+                            {{ m[0] }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">結算建議</h3>
+                    <div v-if="settlements.length === 0" class="text-sm text-gray-400">目前收支平衡，無需付款。</div>
+                    <div v-for="s in settlements" class="flex justify-between items-center py-2 text-sm">
+                        <div class="flex items-center">
+                            <span class="font-bold text-gray-800">{{ s.from }}</span>
+                            <i class="fa-solid fa-arrow-right mx-2 text-sakura-300"></i>
+                            <span class="font-bold text-gray-800">{{ s.to }}</span>
+                        </div>
+                        <span class="font-bold text-sakura-600">¥{{ Math.round(s.amount).toLocaleString() }}</span>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-4">新增支出</h3>
+                    <div class="space-y-3">
+                        <input v-model="newExpense.title" placeholder="項目 (例如: 燒肉)" class="w-full bg-gray-50 p-3 rounded-xl outline-none focus:ring-2 focus:ring-sakura-300 transition-all">
+                        <div class="flex gap-2">
+                            <input v-model.number="newExpense.amount" type="number" placeholder="金額" class="w-2/3 bg-gray-50 p-3 rounded-xl outline-none focus:ring-2 focus:ring-sakura-300">
+                            <select v-model="newExpense.payer" class="w-1/3 bg-gray-50 p-3 rounded-xl outline-none">
+                                <option v-for="m in members" :value="m">{{ m }}</option>
+                            </select>
+                        </div>
+                        <button @click="addExpense" class="w-full bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-gray-700 transition-shadow shadow-lg">加入紀錄</button>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div v-for="(ex, idx) in expenses" class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
+                        <div>
+                            <p class="font-bold text-gray-800">{{ ex.title }}</p>
+                            <p class="text-xs text-gray-400">由 {{ ex.payer }} 支付</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="font-bold text-gray-800">¥{{ ex.amount.toLocaleString() }}</span>
+                            <button @click="removeExpense(idx)" class="text-gray-300 hover:text-red-500"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="currentTab === 'map'" class="space-y-4">
+                <div class="bg-white p-4 rounded-2xl shadow-sm mb-4">
+                    <p class="text-sm text-gray-500 mb-2">點擊卡片將開啟 Google Maps 導航</p>
+                </div>
+
+                <div v-for="loc in savedLocations" :key="loc.name" 
+                    @click="openMap(loc.query)"
+                    class="bg-white p-0 rounded-2xl shadow-sm overflow-hidden active:scale-95 transition-transform cursor-pointer">
+                    <div class="h-24 bg-gray-200 relative overflow-hidden">
+                        <div class="absolute inset-0 bg-cover bg-center opacity-80" :style="`background-image: url('https://maps.googleapis.com/maps/api/staticmap?center=${loc.name}&zoom=14&size=400x200&key=YOUR_API_KEY_PLACEHOLDER')`"></div> 
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+                            <h3 class="text-white font-bold text-lg">{{ loc.name }}</h3>
+                        </div>
+                        <div class="absolute top-2 right-2 bg-white/90 px-2 py-1 rounded-lg text-xs font-bold text-gray-700">
+                            {{ loc.city }}
+                        </div>
+                    </div>
+                    <div class="p-4 flex justify-between items-center">
+                        <div class="text-sm text-gray-600">
+                            <i class="fa-solid fa-tag text-sakura-500 mr-2"></i>{{ loc.type }}
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                            <i class="fa-solid fa-location-arrow"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <nav class="bg-white px-6 py-3 pb-6 flex justify-between items-center shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-30">
+            <button @click="currentTab = 'schedule'" :class="currentTab === 'schedule' ? 'text-sakura-500' : 'text-gray-400'" class="flex flex-col items-center gap-1 transition-colors w-16">
+                <i class="fa-solid fa-calendar-day text-xl"></i>
+                <span class="text-[10px] font-bold">行程</span>
+            </button>
+            <button @click="currentTab = 'money'" :class="currentTab === 'money' ? 'text-sakura-500' : 'text-gray-400'" class="flex flex-col items-center gap-1 transition-colors w-16">
+                <i class="fa-solid fa-coins text-xl"></i>
+                <span class="text-[10px] font-bold">分帳</span>
+            </button>
+            <button @click="currentTab = 'map'" :class="currentTab === 'map' ? 'text-sakura-500' : 'text-gray-400'" class="flex flex-col items-center gap-1 transition-colors w-16">
+                <i class="fa-solid fa-map-location-dot text-xl"></i>
+                <span class="text-[10px] font-bold">地圖</span>
+            </button>
+        </nav>
+
+        <div v-if="showAddModal" class="absolute inset-0 bg-black/50 z-50 flex items-end justify-center backdrop-blur-sm" @click.self="showAddModal = false">
+            <div class="bg-white w-full rounded-t-3xl p-6 animate-slide-up">
+                <h3 class="font-bold text-lg mb-4 text-gray-800">新增行程至 {{ tripDays[activeDate].dateShort }}</h3>
+                <div class="space-y-4">
+                    <input v-model="newEvent.time" type="time" class="w-full bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <input v-model="newEvent.title" placeholder="要做什麼？(例: 穿和服)" class="w-full bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <input v-model="newEvent.location" placeholder="地點 (例: 清水寺)" class="w-full bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <button @click="addEvent" class="w-full bg-sakura-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-sakura-500/30">確認新增</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed } = Vue;
+
+    createApp({
+        setup() {
+            const currentTab = ref('schedule');
+            const showAddModal = ref(false);
+            const activeDate = ref(0);
+
+            // 1. 行程資料 (預設 3/28 - 4/5)
+            const tripDays = ref([
+                { dateShort: '3/28', dayName: '週六', events: [{ time: '08:00', title: '出發！前往機場', location: '桃園機場 T2' }, { time: '14:00', title: '抵達關西', location: '關西機場' }, { time: '16:00', title: 'Check-in', location: '大阪心齋橋飯店' }] },
+                { dateShort: '3/29', dayName: '週日', events: [{ time: '09:00', title: '賞櫻攝影', location: '大阪城公園' }] },
+                { dateShort: '3/30', dayName: '週一', events: [{ time: '10:00', title: '移動日', location: '前往京都' }, { time: '14:00', title: '穿和服', location: '清水寺' }] },
+                { dateShort: '3/31', dayName: '週二', events: [{ time: '05:00', title: '日出攝影', location: '嵐山渡月橋' }] },
+                { dateShort: '4/01', dayName: '週三', events: [{ time: '10:00', title: '新幹線', location: '前往東京' }] },
+                { dateShort: '4/02', dayName: '週四', events: [{ time: '10:00', title: '逛街', location: '澀谷 Scramble Square' }] },
+                { dateShort: '4/03', dayName: '週五', events: [{ time: '09:00', title: '賞櫻野餐', location: '新宿御苑' }] },
+                { dateShort: '4/04', dayName: '週六', events: [{ time: '10:00', title: '採買伴手禮', location: '銀座' }] },
+                { dateShort: '4/05', dayName: '週日', events: [{ time: '14:00', title: '回程', location: '成田機場' }] },
+            ]);
+
+            const newEvent = ref({ time: '', title: '', location: '' });
+
+            const addEvent = () => {
+                if(!newEvent.value.title) return;
+                tripDays.value[activeDate.value].events.push({ ...newEvent.value });
+                tripDays.value[activeDate.value].events.sort((a,b) => a.time.localeCompare(b.time));
+                newEvent.value = { time: '', title: '', location: '' };
+                showAddModal.value = false;
+            };
+
+            const deleteEvent = (index) => {
+                if(confirm('確定刪除此行程？')) {
+                    tripDays.value[activeDate.value].events.splice(index, 1);
+                }
+            };
+
+            // 2. 分帳資料
+            const members = ref(['我', '朋友A', '朋友B']);
+            const expenses = ref([
+                { title: '第一晚居酒屋', amount: 12000, payer: '我' },
+                { title: '環球影城門票', amount: 25000, payer: '朋友A' },
+            ]);
+            const newExpense = ref({ title: '', amount: '', payer: '我' });
+
+            const totalExpense = computed(() => expenses.value.reduce((acc, cur) => acc + cur.amount, 0));
+
+            const addExpense = () => {
+                if (!newExpense.value.title || !newExpense.value.amount) return;
+                expenses.value.push({ ...newExpense.value });
+                newExpense.value = { title: '', amount: '', payer: '我' };
+            };
+            
+            const removeExpense = (idx) => expenses.value.splice(idx, 1);
+
+            // 分帳核心演算法
+            const settlements = computed(() => {
+                let balances = {};
+                members.value.forEach(m => balances[m] = 0);
+                
+                // 計算每人已付金額
+                expenses.value.forEach(ex => {
+                    balances[ex.payer] += ex.amount;
+                });
+
+                // 計算每人應付 (平均)
+                const perPerson = totalExpense.value / members.value.length;
+                
+                // 計算淨額 (正=多付了要收錢，負=少付了要給錢)
+                let debtors = [];
+                let creditors = [];
+
+                for (let m in balances) {
+                    const diff = balances[m] - perPerson;
+                    if (diff < -1) debtors.push({ name: m, amount: Math.abs(diff) });
+                    if (diff > 1) creditors.push({ name: m, amount: diff });
+                }
+
+                let result = [];
+                let i = 0, j = 0;
+                
+                while (i < debtors.length && j < creditors.length) {
+                    let amount = Math.min(debtors[i].amount, creditors[j].amount);
+                    if (amount > 0) {
+                        result.push({
+                            from: debtors[i].name,
+                            to: creditors[j].name,
+                            amount: amount
+                        });
+                    }
+                    
+                    debtors[i].amount -= amount;
+                    creditors[j].amount -= amount;
+
+                    if (debtors[i].amount < 1) i++;
+                    if (creditors[j].amount < 1) j++;
+                }
+                return result;
+            });
+
+            // 3. 地圖資料
+            const savedLocations = ref([
+                { name: '清水寺', city: '京都', type: '景點', query: 'Kiyomizu-dera Kyoto' },
+                { name: '大阪城', city: '大阪', type: '攝影', query: 'Osaka Castle' },
+                { name: '新宿御苑', city: '東京', type: '賞櫻', query: 'Shinjuku Gyoen National Garden' },
+                { name: '道頓堀', city: '大阪', type: '美食', query: 'Dotonbori Osaka' },
+            ]);
+
+            const openMap = (query) => {
+                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+            };
+
+            const currentTabTitle = computed(() => {
+                const titles = { schedule: '行程規劃', money: '旅費分帳', map: '景點導航' };
+                return titles[currentTab.value];
+            });
+
+            return {
+                currentTab, currentTabTitle,
+                tripDays, activeDate, showAddModal, newEvent, addEvent, deleteEvent,
+                members, expenses, newExpense, addExpense, removeExpense, totalExpense, settlements,
+                savedLocations, openMap
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
